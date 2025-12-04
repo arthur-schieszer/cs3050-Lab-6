@@ -371,11 +371,10 @@ def load_end_nodes_from_csv(filename: str) -> List[int]:
         reader = csv.DictReader(f)
         for row in reader:
             node_id = int(row['node'])
-            # Assuming 'priority' exists in the CSV, if you need a different column, change it below.
-            priority = float(row['priority'])  # Default priority to 1.0 if not specified
+            priority = float(row['priority'])
             end_nodes.append((node_id, priority))
 
-    end_nodes.sort(key=lambda item: item[1])  # Sort by priority
+    end_nodes.sort(key=lambda item: item[1])  # Sort by priority so I can get rid of the extra unncessary data
     for node in end_nodes:
         print(f"Node {node[0]} with priority {node[1]}")
     return [node_id for node_id, _ in end_nodes]
