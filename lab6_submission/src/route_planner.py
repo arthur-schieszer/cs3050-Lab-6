@@ -201,6 +201,68 @@ def astar_time(graph: Graph, start: int, end: int) -> Tuple[Dict[int, float], Di
     return dist, prev, nodes_explored
 
 
+def astar_priority(graph: Graph, start: int, end_nodes: List[int]) -> Tuple[Dict[int, float], List[int], int]:
+    """
+    A* algorithm for shortest path visiting multiple nodes in sequence
+    Returns: (distances, path as list, nodes explored)
+    """
+    total_nodes_explored = 0
+    current_start = start
+    full_path = [start]
+    cumulative_distance = 0
+    priorities_visited = set()
+    
+    for end in end_nodes: ## run A* for each end node in order
+        if end in priorities_visited:
+            continue  # Skip already visited priority nodes, shortening the path if a priority node was accidentally visited out of order
+
+        ## Otherwise normal A* implementation
+        dist = {node_id: float('inf') for node_id in graph.nodes}
+        prev = {node_id: None for node_id in graph.nodes}
+        dist[current_start] = 0
+        end_node = graph.nodes[end]
+        
+        def heuristic(node_id: int) -> float:
+            node = graph.nodes[node_id]
+            return haversine(node.lat, node.lon, end_node.lat, end_node.lon)
+        
+        pq = [(heuristic(current_start), current_start)]
+        nodes_explored = 0
+        visited = set()
+        
+        while pq:
+            _, u = heapq.heappop(pq)
+            if u in visited:
+                continue
+            visited.add(u)
+            if u in end_nodes:
+                priorities_visited.add(u)
+            nodes_explored += 1
+            if u == end:
+                break
+            for edge in graph.adj_list.get(u, []):
+                v = edge.to
+                alt = dist[u] + edge.weight
+                if alt < dist[v]:
+                    dist[v] = alt
+                    prev[v] = u
+                    f_score = alt + heuristic(v)
+                    heapq.heappush(pq, (f_score, v))
+
+        ## Reconstruct this part of the path and append to full path
+        
+        segment = reconstruct_path(prev, current_start, end)
+        if segment:
+            full_path.extend(segment[1:])
+        cumulative_distance += dist[end]
+        total_nodes_explored += nodes_explored
+        current_start = end
+    
+    combined_dist = {node: float('inf') for node in graph.nodes}
+    combined_dist[end_nodes[-1]] = cumulative_distance
+    
+    return combined_dist, full_path, total_nodes_explored
+
 def bellman_ford(graph: Graph, start: int, end: int) -> Tuple[Optional[Dict[int, float]], Optional[Dict[int, Optional[int]]], int]:
     """
     Bellman-Ford algorithm for shortest path
@@ -300,61 +362,92 @@ def load_graph(nodes_file: str, edges_file: str) -> Graph:
     return graph
 
 
+def load_end_nodes_from_csv(filename: str) -> List[int]:
+    """Loads end nodes and priorities from a CSV file.
+    Returns: A list of tuples, where each tuple is (node_id, priority).
+    """
+    end_nodes = []
+    with open(filename, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            node_id = int(row['node'])
+            # Assuming 'priority' exists in the CSV, if you need a different column, change it below.
+            priority = float(row['priority'])  # Default priority to 1.0 if not specified
+            end_nodes.append((node_id, priority))
+
+    end_nodes.sort(key=lambda item: item[1])  # Sort by priority
+    for node in end_nodes:
+        print(f"Node {node[0]} with priority {node[1]}")
+    return [node_id for node_id, _ in end_nodes]
+
+
 def main():
     if len(sys.argv) != 6:
-        print(f"Usage: {sys.argv[0]} <nodes.csv> <edges.csv> <start_node> <end_node> <algorithm>")
+        print(f"Usage: {sys.argv[0]} <nodes.csv> <edges.csv> <start_node> <end_node|priorities.csv> <algorithm>")
         print("Algorithms: dijkstra, astar, bellman-ford, astar_time")
         sys.exit(1)
     
     nodes_file = sys.argv[1]
     edges_file = sys.argv[2]
     start_node = int(sys.argv[3])
-    end_node = int(sys.argv[4])
+    end_node_arg = sys.argv[4]
     algorithm = sys.argv[5]
     
     # Load graph
     graph = load_graph(nodes_file, edges_file)
-    
-    # Validate nodes
-    if start_node not in graph.nodes or end_node not in graph.nodes:
+
+
+    if end_node_arg.isdigit():
+        end_nodes = [int(end_node_arg)]  # Single end node
+    else:
+        end_nodes = [node_id for node_id in load_end_nodes_from_csv(end_node_arg)]  # Load from CSV
+
+        # Validate nodes
+    if start_node not in graph.nodes or end_nodes[0] not in graph.nodes:
         print("Invalid start or end node")
         sys.exit(1)
     
     # Run selected algorithm
     if algorithm == "dijkstra":
         print("=== Dijkstra's Algorithm ===")
-        dist, prev, nodes_explored = dijkstra(graph, start_node, end_node)
+        dist, prev, nodes_explored = dijkstra(graph, start_node, end_nodes[0])
     elif algorithm == "astar":
         print("=== A* Algorithm ===")
-        dist, prev, nodes_explored = astar(graph, start_node, end_node)
+        dist, prev, nodes_explored = astar(graph, start_node, end_nodes[0])
     elif algorithm == "bellman-ford":
         print("=== Bellman-Ford Algorithm ===")
-        dist, prev, nodes_explored = bellman_ford(graph, start_node, end_node)
+        dist, prev, nodes_explored = bellman_ford(graph, start_node, end_nodes[0])
         if dist is None:
             print("Negative cycle detected!")
             sys.exit(1)
     elif algorithm == "astar_time":
         print("=== A* Algorithm with Time Windows ===")
-        dist, prev, nodes_explored = astar_time(graph, start_node, end_node)
-        dist_astar, prev_astar, nodes_explored_astar = astar(graph, start_node, end_node) ## running normal astar so I have someting to compare against
+        dist, prev, nodes_explored = astar_time(graph, start_node, end_nodes[0])
+        dist_astar, prev_astar, nodes_explored_astar = astar(graph, start_node, end_nodes[0]) ## running normal astar so I have someting to compare against
 
-        if dist[end_node] is None or dist[end_node] == float('inf'): ## if no feasible path was found that fits the time windows
+        if dist[end_nodes[0]] is None or dist[end_nodes[0]] == float('inf'): ## if no feasible path was found that fits the time windows
             print("No feasible path found due to time constraints.")
             print("!!! WARNING!!! Displaying the closest match path ignoring time constraints:")
-            print_path(graph, prev_astar, start_node, end_node, dist_astar[end_node])
-        elif dist[end_node] > dist_astar[end_node]: ## if a feasible path was found but it is longer than the unconstrained shortest path
+            print_path(graph, prev_astar, start_node, end_nodes[0], dist_astar[end_nodes[0]])
+        elif dist[end_nodes[0]] > dist_astar[end_nodes[0]]: ## if a feasible path was found but it is longer than the unconstrained shortest path
             print("A* with Time Windows found a path, but it was not the shortest possible path. The shortest path violated time constraints.")
             print("Displaying the feasible path found:")
-        if dist is None:
-            print("Negative cycle detected!")
-            sys.exit(1)
+    elif algorithm == "astar_priority":
+        print("=== A* Algorithm with Note Priorities ===")
+        dist, path, nodes_explored = astar_priority(graph, start_node, end_nodes)
+        path_str = " -> ".join(str(node) for node in path)
+        print(f"Path from {start_node} to {end_nodes[-1]}: {path_str}")
+        print(f"Total distance: {dist[end_nodes[-1]]:.2f} km")
+        print(f"Nodes explored: {nodes_explored}")
+        sys.exit(0)
+
     else:
         print(f"Unknown algorithm: {algorithm}")
         print("Available algorithms: dijkstra, astar, bellman-ford")
         sys.exit(1)
     
     # Print results
-    print_path(graph, prev, start_node, end_node, dist[end_node])
+    print_path(graph, prev, start_node, end_nodes[0], dist[end_nodes[0]])
     print(f"Nodes explored: {nodes_explored}")
 
 

@@ -14,21 +14,25 @@ PYTHON ?= python3
 SCRIPT ?= route_planner.py
 
 DATA_DIR ?= ../tests
-NODES_FILE ?= nodes.csv
-EDGES_FILE ?= edges.csv
+NODES_FILE ?= nodes_feasible.csv
+EDGES_FILE ?= edges_feasible.csv
+PRIORITIES_FILE ?= priorities.csv
 NODES ?= $(DATA_DIR)/$(NODES_FILE)
 EDGES ?= $(DATA_DIR)/$(EDGES_FILE)
+PRIORITIES ?= $(DATA_DIR)/$(PRIORITIES_FILE)
 START ?= 1
 END   ?= 5
 ALGO  ?= bellman-ford
 ALGO2  ?= dijkstra
 ALGO3  ?= astar
 ALGO4  ?= astar_time
+ALGO5  ?= astar_priority
 
 ARGS := $(NODES) $(EDGES) $(START) $(END) $(ALGO)
 ARGS2 := $(NODES) $(EDGES) $(START) $(END) $(ALGO2)
 ARGS3 := $(NODES) $(EDGES) $(START) $(END) $(ALGO3)
 ARGS4 := $(NODES) $(EDGES) $(START) $(END) $(ALGO4)
+ARGS5 := $(NODES) $(EDGES) $(START) $(PRIORITIES) $(ALGO5)
 
 
 	
@@ -46,6 +50,7 @@ run: check ## Run the route planner with defaults (override START/END/NODES/EDGE
 	@$(PYTHON) $(SCRIPT) $(ARGS2)
 	@$(PYTHON) $(SCRIPT) $(ARGS3)
 	@$(PYTHON) $(SCRIPT) $(ARGS4)
+	@$(PYTHON) $(SCRIPT) $(ARGS5)
 
 run-venv: check ## Run using the virtualenv's Python
 	@test -x "$(VENV_PY)" || { echo "No $(VENV_PY). Run 'make venv' first."; exit 1; }
