@@ -377,8 +377,10 @@ def load_end_nodes_from_csv(filename: str) -> List[int]:
             end_nodes.append((node_id, priority))
 
     end_nodes.sort(key=lambda item: item[1])  # Sort by priority so I can get rid of the extra unncessary data
+    '''
     for node in end_nodes:
         print(f"Node {node[0]} with priority {node[1]}")
+    '''
     return [node_id for node_id, _ in end_nodes]
 
 
