@@ -235,10 +235,12 @@ def astar_priority(graph: Graph, start: int, end_nodes: List[int]) -> Tuple[Dict
             if u in visited:
                 continue
             visited.add(u)
-            if u in end_nodes:
+            if (u in end_nodes) and (u != end) and (u not in priorities_visited):
+                print(f"Priority node {u} reached early (out of order). Will not make a seperate stop here.")
                 priorities_visited.add(u)
             nodes_explored += 1
             if u == end:
+                priorities_visited.add(u)
                 break
             for edge in graph.adj_list.get(u, []):
                 v = edge.to
